@@ -142,7 +142,7 @@ class UrlwatchCommand:
         return 0
 
     def run_job(self):
-        print('This function is deprecated and should not be used anymore!')
+        print('--run-job is deprecated and should not be used anymore!')
         job = self._find_job(self.urlwatch_config.run_job)
         if job is None:
             print('Not found: %r' % (self.urlwatch_config.run_job,))
