@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2019 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -75,6 +75,7 @@ class CommandConfig(BaseConfig):
 
         parser = argparse.ArgumentParser(description=urlwatch.__doc__,
                                          formatter_class=argparse.RawDescriptionHelpFormatter)
+        parser.add_argument('joblist', metavar='JOB', type=int, nargs="*", help='index of job(s) to run, as numbered according to the --list command. If none specified, then all jobs will be run.')
         parser.add_argument('--version', action='version', version='%(prog)s {}'.format(urlwatch.__version__))
         parser.add_argument('-v', '--verbose', action='store_true', help='show debug output')
         group = parser.add_argument_group('files and directories')
@@ -84,19 +85,22 @@ class CommandConfig(BaseConfig):
                            default=self.config)
         group.add_argument('--hooks', metavar='FILE', help='use FILE as hooks.py module',
                            default=self.hooks)
-        group.add_argument('--cache', metavar='FILE', help='use FILE as cache database',
+        group.add_argument('--cache', metavar='FILE', help='use FILE as cache database, alternatively can accept a redis URI',
                            default=self.cache)
 
         group = parser.add_argument_group('Authentication')
         group.add_argument('--smtp-login', action='store_true', help='Enter password for SMTP (store in keyring)')
         group.add_argument('--telegram-chats', action='store_true', help='List telegram chats the bot is joined to')
-        group.add_argument('--test-slack', action='store_true', help='Send a test notification to Slack')
+        group.add_argument('--test-reporter', metavar='REPORTER', help='Send a test notification')
+        group.add_argument('--xmpp-login', action='store_true', help='Enter password for XMPP (store in keyring)')
 
         group = parser.add_argument_group('job list management')
         group.add_argument('--list', action='store_true', help='list jobs')
         group.add_argument('--add', metavar='JOB', help='add job (key1=value1,key2=value2,...)')
         group.add_argument('--delete', metavar='JOB', help='delete job by location or index')
         group.add_argument('--test-filter', metavar='JOB', help='test filter output of job by location or index')
+        group.add_argument('--test-diff-filter', metavar='JOB',
+                           help='test diff filter output of job by location or index (needs at least 2 snapshots)')
         group = parser.add_argument_group('interactive commands ($EDITOR/$VISUAL)')
         group.add_argument('--edit', action='store_true', help='edit URL/job list')
         group.add_argument('--edit-config', action='store_true', help='edit configuration file')

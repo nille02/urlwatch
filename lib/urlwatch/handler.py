@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2019 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,12 @@ import datetime
 import logging
 import time
 import traceback
+import tempfile
+import difflib
+import os
+import shlex
+import subprocess
+import email.utils
 
 from .filters import FilterBase
 from .jobs import NotModifiedError
@@ -49,11 +55,30 @@ class JobState(object):
         self.new_data = None
         self.history_data = {}
         self.timestamp = None
+        self.current_timestamp = None
         self.exception = None
         self.traceback = None
         self.tries = 0
         self.etag = None
         self.error_ignored = False
+        self._generated_diff = None
+
+    def __enter__(self):
+        try:
+            self.job.main_thread_enter()
+        except Exception as ex:
+            logger.info('Exception while creating resources for job: %r', self.job, exc_info=True)
+            self.exception = ex
+            self.traceback = traceback.format_exc()
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            self.job.main_thread_exit()
+        except Exception as ex:
+            # We don't want exceptions from releasing resources to override job run results
+            logger.warning('Exception while releasing resources for job: %r', self.job, exc_info=True)
 
     def load(self):
         guid = self.job.get_guid()
@@ -72,30 +97,28 @@ class JobState(object):
 
     def process(self):
         logger.info('Processing: %s', self.job)
+
+        if self.exception:
+            return self
+
         try:
             try:
                 self.load()
+
+                if self.old_data is None and getattr(self.job, 'treat_new_as_changed', False):
+                    # Force creation of a diff for "NEW"ly found items by pretending we had an empty page before
+                    self.old_data = ''
+                    self.timestamp = None
+
                 data = self.job.retrieve(self)
 
                 # Apply automatic filters first
                 data = FilterBase.auto_process(self, data)
 
                 # Apply any specified filters
-                filter_list = self.job.filter
+                for filter_kind, subfilter in FilterBase.normalize_filter_list(self.job.filter):
+                    data = FilterBase.process(filter_kind, subfilter, self, data)
 
-                if filter_list:
-                    if isinstance(filter_list, list):
-                        for item in filter_list:
-                            key = next(iter(item))
-                            filter_kind, subfilter = key, item[key]
-                            data = FilterBase.process(filter_kind, subfilter, self, data)
-                    elif isinstance(filter_list, str):
-                        for filter_kind in filter_list.split(','):
-                            if ':' in filter_kind:
-                                filter_kind, subfilter = filter_kind.split(':', 1)
-                            else:
-                                subfilter = None
-                            data = FilterBase.process(filter_kind, subfilter, self, data)
                 self.new_data = data
 
             except Exception as e:
@@ -117,6 +140,38 @@ class JobState(object):
 
         return self
 
+    def get_diff(self):
+        if self._generated_diff is None:
+            self._generated_diff = self._generate_diff()
+            # Apply any specified diff filters
+            for filter_kind, subfilter in FilterBase.normalize_filter_list(self.job.diff_filter):
+                self._generated_diff = FilterBase.process(filter_kind, subfilter, self, self._generated_diff)
+
+        return self._generated_diff
+
+    def _generate_diff(self):
+        if self.job.diff_tool is not None:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                old_file_path = os.path.join(tmpdir, 'old_file')
+                new_file_path = os.path.join(tmpdir, 'new_file')
+                with open(old_file_path, 'w+b') as old_file, open(new_file_path, 'w+b') as new_file:
+                    old_file.write(self.old_data.encode('utf-8'))
+                    new_file.write(self.new_data.encode('utf-8'))
+                cmdline = shlex.split(self.job.diff_tool) + [old_file_path, new_file_path]
+                proc = subprocess.Popen(cmdline, stdout=subprocess.PIPE)
+                stdout, _ = proc.communicate()
+                # Diff tools return 0 for "nothing changed" or 1 for "files differ", anything else is an error
+                if proc.returncode in (0, 1):
+                    return stdout.decode('utf-8')
+                else:
+                    raise subprocess.CalledProcessError(proc.returncode, cmdline)
+
+        timestamp_old = email.utils.formatdate(self.timestamp, localtime=True)
+        timestamp_new = email.utils.formatdate(self.current_timestamp or time.time(), localtime=True)
+        return '\n'.join(difflib.unified_diff(self.old_data.splitlines(),
+                                              self.new_data.splitlines(),
+                                              '@', '@', timestamp_old, timestamp_new, lineterm=''))
+
 
 class Report(object):
     def __init__(self, urlwatch_config):
@@ -127,9 +182,7 @@ class Report(object):
 
     def _result(self, verb, job_state):
         if job_state.exception is not None:
-            # TODO: Once we require Python >= 3.5, we can just pass in job_state.exception as "exc_info" parameter
-            exc_info = (type(job_state.exception), job_state.exception, job_state.exception.__traceback__)
-            logger.debug('Got exception while processing %r', job_state.job, exc_info=exc_info)
+            logger.debug('Got exception while processing %r', job_state.job, exc_info=job_state.exception)
 
         job_state.verb = verb
         self.job_states.append(job_state)
@@ -157,3 +210,9 @@ class Report(object):
         duration = (end - self.start)
 
         ReporterBase.submit_all(self, self.job_states, duration)
+
+    def finish_one(self, name):
+        end = datetime.datetime.now()
+        duration = (end - self.start)
+
+        ReporterBase.submit_one(name, self, self.job_states, duration)

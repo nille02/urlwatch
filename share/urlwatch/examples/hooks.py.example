@@ -1,7 +1,7 @@
 #
 # Example hooks file for urlwatch
 #
-# Copyright (c) 2008-2019 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@ from urlwatch import reporters
 #
 #    __kind__ = 'case'
 #
-#    def filter(self, data, subfilter=None):
+#    def filter(self, data, subfilter):
 #        # The subfilter is specified using a colon, for example the "case"
 #        # filter here can be specified as "case:upper" and "case:lower"
 #
@@ -69,7 +69,7 @@ from urlwatch import reporters
 #
 #    __kind__ = 'indent'
 #
-#    def filter(self, data, subfilter=None):
+#    def filter(self, data, subfilter):
 #        # The subfilter here is a number of characters to indent
 #
 #        if subfilter is None:
@@ -86,14 +86,16 @@ class CustomMatchUrlFilter(filters.AutoMatchFilter):
     # that have the given properties set
     MATCH = {'url': 'http://example.org/'}
 
-    def filter(self, data):
+    # An auto-match filter does not have any subfilters
+    def filter(self, data, subfilter):
         return data.replace('foo', 'bar')
 
 class CustomRegexMatchUrlFilter(filters.RegexMatchFilter):
     # Similar to AutoMatchFilter
     MATCH = {'url': re.compile('http://example.org/.*')}
 
-    def filter(self, data):
+    # An auto-match filter does not have any subfilters
+    def filter(self, data, subfilter):
         return data.replace('foo', 'bar')
 
 

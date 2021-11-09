@@ -12,7 +12,7 @@ report:
       path: sendmail
     smtp:
       host: localhost
-      keyring: true
+      auth: true
       port: 25
       starttls: true
     subject: '{count} changes: {jobs}'
@@ -21,7 +21,7 @@ report:
     diff: unified
   pushover:
     app: ''
-    device: ''
+    device: null
     enabled: false
     sound: 'spacealarm'
     user: ''

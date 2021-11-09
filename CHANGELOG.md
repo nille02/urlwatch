@@ -4,16 +4,227 @@ All notable changes to this project will be documented in this file.
 
 The format mostly follows [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [UNRELEASED]
+
+## [2.24] -- 2021-11-07
+
+### Added
+
+- The Telegram reporter has gained two new options:
+  - `silent`: Receive message notification without sound
+  - `monospace`: Format message in monospace style
+- Support for running a subset of jobs by specifying their index on the command line
+
+### Changed
+
+- Migrated CI pipeline from Travis CI to Github Actions
+- `user_visible_url` can now be specified for all job types (#654, by kongomongo)
+- Added a `remove-duplicate-lines` filter. 
+- Added a `csv2text` filter.
+- Set envelope from (`-f` option) when sending emails using `sendmail`
+- It is now possible to override the HTTP `method` when `data` is set on a URL job
+
+### Fixed
+
+- Fix UnboundLocalError when SMTP auth is enabled, but keyring is not installed (#667)
+
+## [2.23] -- 2021-04-10
+
+### Added
+
+- New filter: `pretty-xml` to indent/pretty-print XML documents
+- New filter: `jq` to parse, transform, and extract JSON data
+- New reporter: `prowl` (by nitz)
+
+### Fixed
+
+- Proper multi-line highlighting for wdiff (PR#615, by kongomongo)
+- Fix command-line generation for html2text (PR#619, by Eloy Paris)
+
+## [2.22] -- 2020-12-19
+
+### Added
+
+- Added 'wait_until' option to browser jobs to configure how long
+  the headless browser will wait for pages to load.
+- Jobs now have an optional `treat_new_as_changed` (default `false`)
+  key that can be set, and will treat newly-found pages as changed,
+  and display a diff from the empty string (useful for `diff_tool`
+  or `diff_filter` with side effects)
+- New reporters: `discord`, `mattermost`
+- New key `user_visible_url` for URL jobs that can be used to show
+  a different URL in reports (useful if the watched URL is a REST API
+  endpoint, but the report should link to the corresponding web page)
+- The Markdown reporter now supports limiting the report length via the
+  `max_length` parameter of the `submit` method. The length limiting logic is
+  smart in the sense that it will try trimming the details first, followed by
+  omitting them completely, followed by omitting the summary. If a part of the
+  report is omitted, a note about this is added to the report. (PR#572, by
+  Denis Kasak)
+
+### Changed
+
+- Diff output is now generated more uniformly, independent of whether
+  the input data has a trailing newline or not; if this behavior is not
+  intended, use an external `diff_tool` (PR#550, by Adam Goldsmith)
+- The `--test-diff-filter` output now properly reports timestamps from
+  the history entry instead of the current date and time (Fixes #573)
+- Unique GUIDs for jobs are now enforced at load time, append "#1",
+  "#2", ... to the URLs to make them unique if you have multiple
+  different jobs that share the same request URL (Fixes #586)
+- When a config, urls file or hooks file does not exist and should be
+  edited or inited, its parent folders will be created (previously
+  only the urlwatch configuration folder was created; Fixes #594)
+- Auto-matched filters now always get `None` supplied as subfilter;
+  any custom filters must accept a `subfilter` parameter after the
+  existing `data` parameter
+- Drop support for Python 3.5
+
+## Fixed
+
+- Make imports thread-safe: This might increase startup times a bit,
+  as dependencies are imported on bootup instead of when first used.
+  Importing in Python is not (yet) thread-safe, so we cannot import
+  new modules from the worker threads reliably (Fixes #559, #601)
+
+- The Matrix reporter was improved in several ways (PR#572, by Denis Kasak):
+
+  - The maximum length of the report was increase from 4096 to 16384.
+  - The report length limiting is now implemented via the new length limiting
+    functionality of the Markdown reporter. Previously, the report was simply
+    trimmed at the end which could break the diff blocks and make them render
+    incorrectly.
+  - The diff code blocks are now tagged as diffs which will allow the diffs to
+    be syntax highlighted as such. This doesn't yet work in Element, pending on
+    the resolution of trentm/python-markdown2#370.
+
+## [2.21] -- 2020-07-31
+
+### Added
+
+- Added `--test-reporter REPORTER` command-line option to send an
+  example report using any configured notification service
+- `JobBase` now has `main_thread_enter()` and `main_thread_exit()`
+  functions that can be overridden by subclasses to run code in
+  the main thread before and after processing of a job
+  (based on an initial implementation by Chenfeng Bao)
+
+### Removed
+
+- The `--test-slack` command line option has been removed, you can
+  test your Slack reporter configuration using `--test-reporter slack`
+
+### Changed
+
+- The `browser` job now uses Pyppeteer instead of Requests-HTML for
+  rendering pages while executing JavaScript; this makes JavaScript
+  execution work properly (based on code by Chenfeng Bao)
+
+### Fixed
+
+- Applying legacy `hooks.py` filters (broken since 2.19; reported by Maxime Werlen)
+
+
+## [2.20] -- 2020-07-29
+
+### Added
+
+- A job can now have a `diff_filter` set, which works the same way as the normal
+  `filter` (and has the same filters available), but applies to the `diff` output
+  instead of the page content (can be tested with `--test-diff-filter`, needs 2
+  or more historic snapshots in the cache)
+- Documentation now has a section on the configuration settings (`--edit-config`)
+- New filter: ``ocr`` to convert text in images to plaintext (using Tesseract OCR)
+- New reporters:
+  - ``ifttt`` to send an event to If This Then That (ifttt.com) (#512, by Florian Gaultier)
+  - ``xmpp`` to send a message using the XMPP (Jabber) protocol (#533, by Thorben Günther)
+
+### Changed
+
+- The `urlwatch` script (Git only) now works when run from different paths
+- Chunking of strings (e.g. for Slack and Telegram) now adds numbering (e.g.
+  ` (1/2)`) to the messages (only if a message is split into multiple parts)
+- Unit tests have been migrated from `nose` to `pytest`
+  and moved from `test/` to `lib/urlwatch/tests/`
+- The ``css`` and ``xpath`` filters now accept ``skip`` and ``maxitems`` as subfilter
+- The ``shellpipe`` filter now inherits all environment variables (e.g. ``$PATH``)
+  of the ``urlwatch`` process
+
+### Fixed
+
+- The ``html2text`` method ``lynx`` now treats any subfilters with a non-``null``
+  value as command-line argument ``-key value`` (previously only the value ``true``
+  was treated like this, and any other values were silently dropped)
+
+
+## [2.19] -- 2020-07-17
+
+### Added
+
+- Documentation is now available at [urlwatch.readthedocs.io](https://urlwatch.readthedocs.io)
+  and shipped in the source tarball under `docs/`; filter examples in the docs are unit-tested
+- New filters:
+  - `reverse`: Reverse input items (default: line-based) with optional `separator`
+  - `pdf2text`: Convert PDF files to plaintext (must be first filter in chain)
+  - `shellpipe`: Filter text with arbitrary command-line utilities / shell scripts
+- `FilterBase` API improvements for specifying subfilters:
+  - Add `__supported_subfilters__` for sub filter checking and `--features` output
+  - Add `__default_subfilter__` to map value-only parameters to dict parameters,
+    for example the `grep` filter now has a default subfilter named `re`
+- Support for using Redis as a cache backend via `--cache=redis://localhost:6379/`
+
+### Fixed
+
+- Declare updated Python 3.5 dependency in `setup.py` (already a requirement since urlwatch 2.18)
+
+### Changed
+
+- Filter improvements:
+  - `sort`: Add `reverse` option to reverse the sorting order
+  - `sort`: Add `separator` option to specify item separator (default is still line-based)
+  - `beautify`: The `jsbeautifier` (for `<script>` tags) and `cssbeautifier` (for `<style>` tags)
+    module dependencies are now optional - if they are not installed, beautify only works on the HTML
+  - Most filters that only had unnamed subfilters (e.g. `grep`) now have a named default subfilter
+- Reporter improvements:
+  - ``pushover``: The message ``priority`` can now be configured
+- Travis CI: Set `pycodestyle` version to 2.6.0 to avoid CI breakage when new style checks are added
+- Diff results are now runtime cached on a per-job basis, which shouldn't affect behavior, but
+  could be observed by an external `diff_tool` running at most once per job instead of multiple times
+- Jobs with a custom `diff_tool` or a `shellpipe` filter are now ignored if `jobs.yaml` has the
+  world-writable bit (`o+w`) set or is not owned by the current user (does not apply to Windows);
+  previously only `shell` jobs were ignored if the permissions/owners were wrong
+
+### Deprecated
+
+- String-based filter definitions (e.g. `html2text,grep:Current.*version,strip`) are now
+  deprecated, it is recommended to use YAML-based dictionary-style listing of filters,
+  which is more flexible, easier to read and write and more structured
+
+
+## [2.18] -- 2020-05-03
 
 ### Added
 - New filter: `re.sub` that can replace/remove strings using regular expressions
+- Support `ignore_timeout_errors` and `ignore_too_many_redirects` for URL jobs (#423, by Josh aka Zevlag)
+- HTML reporter: Add `viewport` meta tag for improved viewing on mobile devices (#432, by Mike Borsetti)
+- Optional support for insecure SMTP password storage in the config; use with caution (#431)
+- Add `matrix` reporter
+- New filter: `beautify` that can beautify HTML, JavaScript and CSS
 
 ### Fixed
 - Fix `--test-filter` when the specified job is not found
+- Fix another `YAMLLoadWarning` in unit tests (#382, by Louis Sautier)
+- Documentation updates and typo fixes (by Nate Eagleson)
+- Pushover: Fix default device config (Fixes #409 and #372, documented by Richard Goodwin)
 
 ### Changed
 - Nicer formatting of `--features` for jobs with no docstring or many keys
+- The XPath and CSS filters now support XML namespaces (#404, by Chenfeng Bao)
+- Drop support for Python 3.3 and Python 3.4 (new minimum requirement is Python 3.5)
+- Use `html.escape` instead of `cgi.escape` (which was removed in Python 3.8; #424, by Chenfeng Bao)
+- Allow non-ASCII characters in `format-json` output filter (#433, by Mike Borsetti)
+- The `keyring` config option for `email` was changed to `auth`; if you have problems
+  with authentication where none is needed, set `report/email/smtp/auth` to `false`
 
 
 ## [2.17] -- 2019-04-12
@@ -74,7 +285,7 @@ The format mostly follows [Keep a Changelog](http://keepachangelog.com/en/1.0.0/
 
 ### Added
 - Support for Mailgun regions (by Daniel Peukert, PR#280)
-- CLI: Allow multiple occurences of 'filter' when adding jobs (PR#278)
+- CLI: Allow multiple occurrences of 'filter' when adding jobs (PR#278)
 
 ### Changed
 - Fixed incorrect name for chat_id config in the default config (by Robin B, PR#276)

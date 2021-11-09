@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2019 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -40,6 +40,7 @@ import urlwatch
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 from .util import TrackSubClasses
+from .filters import FilterBase
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -162,6 +163,14 @@ class JobBase(object, metaclass=TrackSubClasses):
     def retrieve(self, job_state):
         raise NotImplementedError()
 
+    def main_thread_enter(self):
+        """Called from the main thread before running the job"""
+        ...
+
+    def main_thread_exit(self):
+        """Called from the main thread after running the job"""
+        ...
+
     def format_error(self, exception, tb):
         return tb
 
@@ -171,10 +180,11 @@ class JobBase(object, metaclass=TrackSubClasses):
 
 class Job(JobBase):
     __required__ = ()
-    __optional__ = ('name', 'filter', 'max_tries', 'diff_tool', 'compared_versions')
+    __optional__ = ('name', 'filter', 'max_tries', 'diff_tool', 'compared_versions', 'diff_filter', 'treat_new_as_changed', 'user_visible_url')
 
     # determine if hyperlink "a" tag is used in HtmlReporter
-    LOCATION_IS_URL = False
+    def location_is_url(self):
+        return re.match("^([a-zA-Z0-9+.-]+)://", self.get_location())
 
     def pretty_name(self):
         return self.name if self.name else self.get_location()
@@ -189,7 +199,7 @@ class ShellJob(Job):
     __optional__ = ()
 
     def get_location(self):
-        return self.command
+        return self.user_visible_url or self.command
 
     def retrieve(self, job_state):
         process = subprocess.Popen(self.command, stdout=subprocess.PIPE, shell=True)
@@ -197,6 +207,9 @@ class ShellJob(Job):
         result = process.wait()
         if result != 0:
             raise ShellError(result)
+
+        if FilterBase.filter_chain_needs_bytes(self.filter):
+            return stdout_data
 
         return stdout_data.decode('utf-8')
 
@@ -208,13 +221,13 @@ class UrlJob(Job):
 
     __required__ = ('url',)
     __optional__ = ('cookies', 'data', 'method', 'ssl_no_verify', 'ignore_cached', 'http_proxy', 'https_proxy',
-                    'headers', 'ignore_connection_errors', 'ignore_http_error_codes', 'encoding', 'timeout')
+                    'headers', 'ignore_connection_errors', 'ignore_http_error_codes', 'encoding', 'timeout',
+                    'ignore_timeout_errors', 'ignore_too_many_redirects')
 
-    LOCATION_IS_URL = True
     CHARSET_RE = re.compile('text/(html|plain); charset=([^;]*)')
 
     def get_location(self):
-        return self.url
+        return self.user_visible_url or self.url
 
     def retrieve(self, job_state):
         headers = {
@@ -238,12 +251,14 @@ class UrlJob(Job):
             headers['Cache-Control'] = 'max-age=172800'
             headers['Expires'] = email.utils.formatdate()
 
+        if self.data is not None:
+            if self.method is None:
+                self.method = "POST"
+            headers['Content-type'] = 'application/x-www-form-urlencoded'
+            logger.info('Sending %s request to %s', self.method, self.url)
+
         if self.method is None:
             self.method = "GET"
-        if self.data is not None:
-            self.method = "POST"
-            headers['Content-type'] = 'application/x-www-form-urlencoded'
-            logger.info('Sending POST request to %s', self.url)
 
         if self.http_proxy is not None:
             proxies['http'] = self.http_proxy
@@ -282,6 +297,9 @@ class UrlJob(Job):
 
         # Save ETag from response into job_state, which will be saved in cache
         job_state.etag = response.headers.get('ETag')
+
+        if FilterBase.filter_chain_needs_bytes(self.filter):
+            return response.content
 
         # If we can't find the encoding in the headers, requests gets all
         # old-RFC-y and assumes ISO-8859-1 instead of UTF-8. Use the old
@@ -324,6 +342,10 @@ class UrlJob(Job):
     def ignore_error(self, exception):
         if isinstance(exception, requests.exceptions.ConnectionError) and self.ignore_connection_errors:
             return True
+        if isinstance(exception, requests.exceptions.Timeout) and self.ignore_timeout_errors:
+            return True
+        if isinstance(exception, requests.exceptions.TooManyRedirects) and self.ignore_too_many_redirects:
+            return True
         elif isinstance(exception, requests.exceptions.HTTPError):
             status_code = exception.response.status_code
             ignored_codes = []
@@ -344,13 +366,17 @@ class BrowserJob(Job):
 
     __required__ = ('navigate',)
 
-    LOCATION_IS_URL = True
+    __optional__ = ('wait_until',)
 
     def get_location(self):
-        return self.navigate
+        return self.user_visible_url or self.navigate
+
+    def main_thread_enter(self):
+        from .browser import BrowserContext
+        self.ctx = BrowserContext()
+
+    def main_thread_exit(self):
+        self.ctx.close()
 
     def retrieve(self, job_state):
-        from requests_html import HTMLSession
-        session = HTMLSession()
-        response = session.get(self.navigate)
-        return response.html.html
+        return self.ctx.process(self.navigate, wait_until=self.wait_until)

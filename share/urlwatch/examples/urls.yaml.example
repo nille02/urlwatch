@@ -6,7 +6,10 @@ url: "https://thp.io/2008/urlwatch/"
 # You can use a pre-supplied filter for this, here we apply two:
 # the html2text filter that converts the HTML to plaintext and
 # the grep filter that filters lines based on a regular expression
-filter: html2text,grep:Current.*version,strip
+filter:
+  - html2text
+  - grep: "Current.*version"
+  - strip
 ---
 # Built-in job kind "shell" needs a command specified
 name: "Home Listing"
@@ -35,7 +38,9 @@ method: "PURGE"
 ---
 # You can do POST requests by providing data parameter.
 # POST data can be a URL-encoded string (see last example) or a dict.
-url: "http://example.com/search.cgi"
+# If you are using the URL multiple times, you need to append "#something" for
+# each different job, so that the URL string still uniquely identifies the job
+url: "http://example.com/search.cgi#alternative"
 data:
   button: Search
   q: something

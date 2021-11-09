@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2019 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,19 +28,20 @@
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-import imp
 import logging
 import os
 import shutil
 import sys
 import requests
+import traceback
 
 from .filters import FilterBase
-from .handler import JobState
+from .handler import JobState, Report
 from .jobs import JobBase, UrlJob
 from .reporters import ReporterBase
-from .util import atomic_rename, edit_file
+from .util import atomic_rename, edit_file, import_module_from_source
 from .mailer import set_password, have_password
+from .xmpp import xmpp_have_password, xmpp_set_password
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +60,10 @@ class UrlwatchCommand:
                 shutil.copy(self.urlwatch_config.hooks, hooks_edit)
             elif self.urlwatch_config.hooks_py_example is not None and os.path.exists(
                     self.urlwatch_config.hooks_py_example):
+                os.makedirs(os.path.dirname(hooks_edit) or '.', exist_ok=True)
                 shutil.copy(self.urlwatch_config.hooks_py_example, hooks_edit)
             edit_file(hooks_edit)
-            imp.load_source('hooks', hooks_edit)
+            import_module_from_source('hooks', hooks_edit)
             atomic_rename(hooks_edit, self.urlwatch_config.hooks)
             print('Saving edit changes in', self.urlwatch_config.hooks)
         except SystemExit:
@@ -99,7 +101,7 @@ class UrlwatchCommand:
                 pretty_name = job.pretty_name()
                 location = job.get_location()
                 if pretty_name != location:
-                    print('%d: %s (%s)' % (idx + 1, pretty_name, location))
+                    print('%d: %s ( %s )' % (idx + 1, pretty_name, location))
                 else:
                     print('%d: %s' % (idx + 1, pretty_name))
         return 0
@@ -116,22 +118,51 @@ class UrlwatchCommand:
         except ValueError:
             return next((job for job in self.urlwatcher.jobs if job.get_location() == query), None)
 
-    def test_filter(self):
-        job = self._find_job(self.urlwatch_config.test_filter)
+    def _get_job(self, id):
+        job = self._find_job(id)
         if job is None:
-            print('Not found: %r' % (self.urlwatch_config.test_filter,))
-            return 1
-        job = job.with_defaults(self.urlwatcher.config_storage.config)
+            print('Not found: {!r}'.format(id))
+            raise SystemExit(1)
+        return job.with_defaults(self.urlwatcher.config_storage.config)
+
+    def test_filter(self, id):
+        job = self._get_job(id)
 
         if isinstance(job, UrlJob):
             # Force re-retrieval of job, as we're testing filters
             job.ignore_cached = True
 
-        job_state = JobState(self.urlwatcher.cache_storage, job)
-        job_state.process()
-        if job_state.exception is not None:
-            raise job_state.exception
-        print(job_state.new_data)
+        with JobState(self.urlwatcher.cache_storage, job) as job_state:
+            job_state.process()
+            if job_state.exception is not None:
+                raise job_state.exception
+            print(job_state.new_data)
+        # We do not save the job state or job on purpose here, since we are possibly modifying the job
+        # (ignore_cached) and we do not want to store the newly-retrieved data yet (filter testing)
+        return 0
+
+    def test_diff_filter(self, id):
+        job = self._get_job(id)
+
+        history_data = self.urlwatcher.cache_storage.get_history_data(job.get_guid(), 10)
+        history_data = sorted(history_data.items(), key=lambda kv: kv[1])
+
+        if len(history_data) and getattr(job, 'treat_new_as_changed', False):
+            # Insert empty history entry, so first snapshot is diffed against the empty string
+            _, first_timestamp = history_data[0]
+            history_data.insert(0, ('', first_timestamp))
+
+        if len(history_data) < 2:
+            print('Not enough historic data available (need at least 2 different snapshots)')
+            return 1
+
+        for i in range(len(history_data) - 1):
+            with JobState(self.urlwatcher.cache_storage, job) as job_state:
+                job_state.old_data, job_state.timestamp = history_data[i]
+                job_state.new_data, job_state.current_timestamp = history_data[i + 1]
+                print('=== Filtered diff between state {} and state {} ==='.format(i, i + 1))
+                print(job_state.get_diff())
+
         # We do not save the job state or job on purpose here, since we are possibly modifying the job
         # (ignore_cached) and we do not want to store the newly-retrieved data yet (filter testing)
         return 0
@@ -176,7 +207,9 @@ class UrlwatchCommand:
         if self.urlwatch_config.edit_hooks:
             sys.exit(self.edit_hooks())
         if self.urlwatch_config.test_filter:
-            sys.exit(self.test_filter())
+            sys.exit(self.test_filter(self.urlwatch_config.test_filter))
+        if self.urlwatch_config.test_diff_filter:
+            sys.exit(self.test_diff_filter(self.urlwatch_config.test_diff_filter))
         if self.urlwatch_config.list:
             sys.exit(self.list_urls())
         if self.urlwatch_config.add is not None or self.urlwatch_config.delete is not None:
@@ -221,25 +254,65 @@ class UrlwatchCommand:
             print('\nChat up your bot here: https://t.me/{}'.format(info['result']['username']))
             sys.exit(0)
 
-    def check_test_slack(self):
-        if self.urlwatch_config.test_slack:
-            config = self.urlwatcher.config_storage.config['report'].get('slack', None)
-            if not config:
-                print('You need to configure slack in your config first (see README.md)')
-                sys.exit(1)
+    def check_test_reporter(self):
+        name = self.urlwatch_config.test_reporter
+        if name is None:
+            return
 
-            webhook_url = config.get('webhook_url', None)
-            if not webhook_url:
-                print('You need to set up your slack webhook_url first (see README.md)')
-                sys.exit(1)
+        if name not in ReporterBase.__subclasses__:
+            print('No such reporter: {}'.format(name))
+            print('\nSupported reporters:\n{}\n'.format(ReporterBase.reporter_documentation()))
+            sys.exit(1)
 
-            info = requests.post(webhook_url, json={"text": "Test message from urlwatch, your configuration is working"})
-            if info.status_code == requests.codes.ok:
-                print('Successfully sent message to Slack')
-                sys.exit(0)
-            else:
-                print('Error while submitting message to Slack:{0}'.format(info.text))
-                sys.exit(1)
+        cfg = self.urlwatcher.config_storage.config['report'].get(name, {'enabled': False})
+        if not cfg.get('enabled', False):
+            print('Reporter is not enabled/configured: {}'.format(name))
+            print('Use {} --edit-config to configure reporters'.format(sys.argv[0]))
+            sys.exit(1)
+
+        report = Report(self.urlwatcher)
+
+        def build_job(name, url, old, new):
+            job = JobBase.unserialize({'name': name, 'url': url})
+
+            # Can pass in None as cache_storage, as we are not
+            # going to load or save the job state for testing;
+            # also no need to use it as context manager, since
+            # no processing is called on the job
+            job_state = JobState(None, job)
+
+            job_state.old_data = old
+            job_state.new_data = new
+
+            return job_state
+
+        def set_error(job_state, message):
+            try:
+                raise ValueError(message)
+            except ValueError as e:
+                job_state.exception = e
+                job_state.traceback = job_state.job.format_error(e, traceback.format_exc())
+
+            return job_state
+
+        report.new(build_job('Newly Added', 'http://example.com/new', '', ''))
+        report.changed(build_job('Something Changed', 'http://example.com/changed', """
+        Unchanged Line
+        Previous Content
+        Another Unchanged Line
+        """, """
+        Unchanged Line
+        Updated Content
+        Another Unchanged Line
+        """))
+        report.unchanged(build_job('Same As Before', 'http://example.com/unchanged',
+                                   'Same Old, Same Old\n',
+                                   'Same Old, Same Old\n'))
+        report.error(set_error(build_job('Error Reporting', 'http://example.com/error', '', ''), 'Oh Noes!'))
+
+        report.finish_one(name)
+
+        sys.exit(0)
 
     def check_smtp_login(self):
         if self.urlwatch_config.smtp_login:
@@ -256,8 +329,8 @@ class UrlwatchCommand:
                 print('Please set the method to SMTP for the e-mail reporter.')
                 success = False
 
-            if not smtp_config['keyring']:
-                print('Keyring authentication must be enabled for SMTP.')
+            if not smtp_config.get('auth', smtp_config.get('keyring', False)):
+                print('Authentication must be enabled for SMTP.')
                 success = False
 
             smtp_hostname = smtp_config['host']
@@ -273,6 +346,10 @@ class UrlwatchCommand:
             if not success:
                 sys.exit(1)
 
+            if 'insecure_password' in smtp_config:
+                print('The password is already set in the config (key "insecure_password").')
+                sys.exit(0)
+
             if have_password(smtp_hostname, smtp_username):
                 message = 'Password for %s / %s already set, update? [y/N] ' % (smtp_username, smtp_hostname)
                 if input(message).lower() != 'y':
@@ -285,11 +362,49 @@ class UrlwatchCommand:
 
             sys.exit(0)
 
+    def check_xmpp_login(self):
+        if self.urlwatch_config.xmpp_login:
+            xmpp_config = self.urlwatcher.config_storage.config['report']['xmpp']
+
+            success = True
+
+            if not xmpp_config['enabled']:
+                print('Please enable XMPP reporting in the config first.')
+                success = False
+
+            xmpp_sender = xmpp_config.get('sender')
+            if not xmpp_sender:
+                print('Please configure the XMPP sender in the config first.')
+                success = False
+
+            if not xmpp_config.get('recipient'):
+                print('Please configure the XMPP recipient in the config first.')
+                success = False
+
+            if not success:
+                sys.exit(1)
+
+            if 'insecure_password' in xmpp_config:
+                print('The password is already set in the config (key "insecure_password").')
+                sys.exit(0)
+
+            if xmpp_have_password(xmpp_sender):
+                message = 'Password for %s already set, update? [y/N] ' % (xmpp_sender)
+                if input(message).lower() != 'y':
+                    print('Password unchanged.')
+                    sys.exit(0)
+
+            if success:
+                xmpp_set_password(xmpp_sender)
+
+            sys.exit(0)
+
     def run(self):
         self.check_edit_config()
         self.check_smtp_login()
         self.check_telegram_chats()
-        self.check_test_slack()
+        self.check_xmpp_login()
+        self.check_test_reporter()
         self.handle_actions()
         self.urlwatcher.run_jobs()
         self.urlwatcher.close()
