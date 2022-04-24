@@ -391,17 +391,11 @@ class EMailReporter(TextReporter):
     def submit(self):
         filtered_job_states = list(self.report.get_filtered_job_states(self.job_states))
 
-        subject_length = self.config.get('subject_length', 512)
-
         subject_args = {
             'count': len(filtered_job_states),
             'jobs': ', '.join(job_state.job.pretty_name() for job_state in filtered_job_states),
         }
         subject = self.config['subject'].format(**subject_args)
-        if subject_length is not None:
-            if len(subject) > subject_length:
-                subject[:subject_length]
-
         body_text = '\n'.join(super().submit())
 
         if not body_text:
