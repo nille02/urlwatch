@@ -390,7 +390,7 @@ class EMailReporter(TextReporter):
 
     def submit(self):
         filtered_job_states = list(self.report.get_filtered_job_states(self.job_states))
-        cfg = self.config['report']['email']
+        cfg = self.config['email']
         subject_length = cfg.get('subject_length', 512)
 
         subject_args = {
