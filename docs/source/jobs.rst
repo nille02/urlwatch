@@ -3,12 +3,22 @@
 Jobs
 ====
 
-Jobs are the kind of things that `urlwatch` can monitor.
+.. only:: man
+
+   Synopsis
+   --------
+
+   urlwatch --edit
+
+   Description
+   -----------
+
+Jobs are the kind of things that :manpage:`urlwatch(1)` can monitor.
 
 The list of jobs to run are contained in the configuration file ``urls.yaml``,
 accessed with the command ``urlwatch --edit``, each separated by a line
 containing only ``---``. The command ``urlwatch --list`` prints the name
-of each job, along with its index number (1,2,3,...) which gets assigned
+of each job, along with its index number (1, 2, 3, ...) which gets assigned
 automatically according to its position in the configuration file.
 
 While optional, it is recommended that each job starts with a ``name`` entry:
@@ -16,6 +26,8 @@ While optional, it is recommended that each job starts with a ``name`` entry:
 .. code-block:: yaml
 
     name: "This is a human-readable name/label of the job"
+
+The following job types are available:
 
 
 URL
@@ -83,7 +95,7 @@ Required keys:
 Job-specific optional keys:
 
 - ``wait_until``:  Either ``load``, ``domcontentloaded``, ``networkidle0``, or ``networkidle2`` (see :ref:`advanced_topics`)
-
+- ``useragent``:  Change useragent (will be passed to pyppeteer)
 
 As this job uses `Pyppeteer <https://github.com/pyppeteer/pyppeteer>`__
 to render the page in a headless Chromium instance, it requires massively
@@ -115,26 +127,87 @@ Required keys:
 
 Job-specific optional keys:
 
-- none
+- ``stderr``: Change how standard error is treated, see below
 
 (Note: ``command`` implies ``kind: shell``)
+
+Configuring ``stderr`` behavior for shell jobs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default urlwatch captures ``stderr`` for error reporting (non-zero exit
+code), but ignores the output when the shell job exits with exit code 0.
+
+This behavior can be customized using the ``stderr`` key:
+
+- ``ignore``: Capture ``stderr``, report on non-zero exit code, ignore otherwise (default)
+- ``urlwatch``: ``stderr`` of the shell job is sent to ``stderr`` of the ``urlwatch`` process;
+  any error message on ``stderr`` will not be visible in the error message from the reporter
+  (legacy default behavior of urlwatch 2.24 and older)
+- ``fail``: Treat the job as failed if there is *any* output on ``stderr``, even with exit status 0
+- ``stdout``: Merge ``stderr`` output into ``stdout``, which means stderr output is also considered
+  for the change detection/diff part of urlwatch (this is similar to ``2>&1`` in a shell)
+
+For example, this job definition will make the job appear as failed,
+even though the script exits with exit code 0:
+
+.. code-block:: yaml
+
+    command: |
+      echo "Normal standard output."
+      echo "Something goes to stderr, which makes this job fail." 1>&2
+      exit 0
+    stderr: fail
+
+On the other hand, if you want to diff both stdout and stderr of the job, use this:
+
+.. code-block:: yaml
+
+    command: |
+      echo "An important line on stdout."
+      echo "Another important line on stderr." 1>&2
+    stderr: stdout
 
 
 Optional keys for all job types
 -------------------------------
 
 - ``name``: Human-readable name/label of the job
-- ``filter``: :ref:`filters` (if any) to apply to the output (can be tested with ``--test-filter``)
+- ``filter``: :doc:`filters` (if any) to apply to the output (can be tested with ``--test-filter``)
 - ``max_tries``: Number of times to retry fetching the resource
 - ``diff_tool``: Command to a custom tool for generating diff text
-- ``diff_filter``: :ref:`filters` (if any) to apply to the diff result (can be tested with ``--test-diff-filter``)
+- ``diff_filter``: :doc:`filters` (if any) to apply to the diff result (can be tested with ``--test-diff-filter``)
 - ``treat_new_as_changed``: Will treat jobs that don't have any historic data as ``CHANGED`` instead of ``NEW`` (and create a diff for new jobs)
 - ``compared_versions``: Number of versions to compare for similarity
 - ``kind`` (redundant): Either ``url``, ``shell`` or ``browser``.  Automatically derived from the unique key (``url``, ``command`` or ``navigate``) of the job type
 - ``user_visible_url``: Different URL to show in reports (e.g. when watched URL is a REST API URL, and you want to show a webpage)
 
 
-Settings keys for all jobs at once
-----------------------------------
+Setting keys for all jobs at once
+---------------------------------
 
-See :ref:`job_defaults` for how to configure keys for all jobs at once.
+The main :doc:`configuration` file has a ``job_defaults``
+key that can be used to configure keys for all jobs at once.
+
+.. only:: man
+
+    See :manpage:`urlwatch-config(5)` for how to configure job defaults.
+
+.. only:: man
+
+    Examples
+    --------
+
+    See :manpage:`urlwatch-cookbook(7)` for example job configurations.
+
+    Files
+    -----
+
+    ``$XDG_CONFIG_HOME/urlwatch/urls.yaml``
+
+    See also
+    --------
+
+    :manpage:`urlwatch(1)`,
+    :manpage:`urlwatch-intro(5)`,
+    :manpage:`urlwatch-filters(5)`
+

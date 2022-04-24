@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2022 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -52,7 +52,7 @@ class BaseConfig(object):
 
 class CommandConfig(BaseConfig):
 
-    def __init__(self, pkgname, urlwatch_dir, bindir, prefix, config, urls, hooks, cache, verbose):
+    def __init__(self, args, pkgname, urlwatch_dir, bindir, prefix, config, urls, hooks, cache, verbose):
         super().__init__(pkgname, urlwatch_dir, config, urls, cache, hooks, verbose)
         self.bindir = bindir
         self.prefix = prefix
@@ -69,9 +69,9 @@ class CommandConfig(BaseConfig):
         self.urls_yaml_example = os.path.join(self.examples_dir, 'urls.yaml.example')
         self.hooks_py_example = os.path.join(self.examples_dir, 'hooks.py.example')
 
-        self.parse_args()
+        self.parse_args(args)
 
-    def parse_args(self):
+    def parse_args(self, cmdline_args):
 
         parser = argparse.ArgumentParser(description=urlwatch.__doc__,
                                          formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -90,9 +90,9 @@ class CommandConfig(BaseConfig):
 
         group = parser.add_argument_group('Authentication')
         group.add_argument('--smtp-login', action='store_true', help='Enter password for SMTP (store in keyring)')
+        group.add_argument('--xmpp-login', action='store_true', help='Enter password for XMPP (store in keyring)')
         group.add_argument('--telegram-chats', action='store_true', help='List telegram chats the bot is joined to')
         group.add_argument('--test-reporter', metavar='REPORTER', help='Send a test notification')
-        group.add_argument('--xmpp-login', action='store_true', help='Enter password for XMPP (store in keyring)')
 
         group = parser.add_argument_group('job list management')
         group.add_argument('--list', action='store_true', help='list jobs')
@@ -101,7 +101,11 @@ class CommandConfig(BaseConfig):
         group.add_argument('--test-filter', metavar='JOB', help='test filter output of job by location or index')
         group.add_argument('--test-diff-filter', metavar='JOB',
                            help='test diff filter output of job by location or index (needs at least 2 snapshots)')
+<<<<<<< HEAD
         group.add_argument('--run-job', metavar='JOB', help='run a single Job by location or index')
+=======
+        group.add_argument('--dump-history', metavar='JOB', help='dump historical cached data for a job')
+>>>>>>> 4ee1d03b258d0cbd4350d9fc911fa7920b036cd5
         group = parser.add_argument_group('interactive commands ($EDITOR/$VISUAL)')
         group.add_argument('--edit', action='store_true', help='edit URL/job list')
         group.add_argument('--edit-config', action='store_true', help='edit configuration file')
@@ -110,7 +114,7 @@ class CommandConfig(BaseConfig):
         group.add_argument('--features', action='store_true', help='list supported jobs/filters/reporters')
         group.add_argument('--gc-cache', action='store_true', help='remove old cache entries')
 
-        args = parser.parse_args()
+        args = parser.parse_args(cmdline_args)
 
         for i, arg in enumerate(vars(args)):
             argval = getattr(args, arg)

@@ -4,7 +4,49 @@ All notable changes to this project will be documented in this file.
 
 The format mostly follows [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [UNRELEASED]
+## UNRELEASED
+
+### Added
+
+- `browser` job: Add support for specifying `useragent` (#700, by Francesco Versaci)
+
+### Fixed
+
+- Limit e-mail header length to 78 characters to avoid issues with some SMTP servers
+  (PR#703, fixes #702, by Julien Palard)
+
+## [2.25] -- 2022-03-15
+
+### Added
+
+- Add a `colored` setting for the Discord reporter, enabled by default (PR#683 by Michał Ciołek)
+- Add a `splitlines` filter for trimming leading/trailing whitespace in each line (PR#693 by Lukas Anzinger)
+- If a shell job fails, the job's `stdout` and `stderr` are added to the error message (fixes #689)
+- `shell` job: Add optional `stderr` key to customize how output on `stderr` is treated
+- Add `--dump-history JOB` command-line option to print historic job outputs (fixes #681)
+- Add `display` / `empty-diff` configuration option to skip reports when diffs are empty
+  due to `diff_filter` (fixes #692)
+- New man pages: `urlwatch-intro(7)`, `urlwatch-deprecated(7)`, `urlwatch-cookbook(7)`,
+  `urlwatch-jobs(5)`, `urlwatch-filters(5)`, `urlwatch-config(5)` and `urlwatch-reporters(5)`.
+
+### Changed
+
+- Require minidb 2.0.6; issue `VACUUM` only with `--gc-cache` (fixes #690)
+- For shell jobs, `stderr` output isn't sent to urlwatch's stdout anymore; add `stdout: urlwatch`
+  to your shell job definition if you depend on the old default behavior
+
+### Fixed
+
+- `pytest` command-line arguments are not wrongly interpreted by `CommandConfig` anymore (fixes #677)
+
+### Packaging
+
+- Man pages in `share/man/` are generated from `docs/source/` using Sphinx. In order to not require
+  Sphinx for normal installation, `update-manpages.sh` is used to generate and fix up man pages
+  stored in `shared/`. These man pages are stored in Git and in the release tarballs, so installations
+  from source do not need to have Sphinx available for the manpages to be available.
+- Packagers can customize the `manpages_url` setting in `docs/source/conf.py` to point to the distribution's
+  web man pages for the generated HTML documentation (if Sphinx is used to generate HTML docs).
 
 ## [2.24] -- 2021-11-07
 

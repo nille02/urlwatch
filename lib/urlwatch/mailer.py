@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2022 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -99,7 +99,7 @@ class SMTPMailer(Mailer):
                 raise ValueError('SMTP auth is enabled, but insecure_password is not set and keyring is not available')
             s.login(self.smtp_user, passwd)
 
-        s.sendmail(msg['From'], msg['To'].split(','), msg.as_string())
+        s.sendmail(msg['From'], msg['To'].split(','), msg.as_string(maxheaderlen=78))
         s.quit()
 
 
@@ -112,7 +112,7 @@ class SendmailMailer(Mailer):
                              stdin=subprocess.PIPE,
                              stderr=subprocess.PIPE,
                              universal_newlines=True)
-        result = p.communicate(msg.as_string())
+        result = p.communicate(msg.as_string(maxheaderlen=78))
         if p.returncode:
             logger.error('Sendmail failed with {result}'.format(result=result))
 

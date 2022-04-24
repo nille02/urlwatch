@@ -80,7 +80,7 @@ def test_load_hooks_py():
 def test_pep8_conformance():
     """Test that we conform to PEP-8."""
     import pycodestyle
-    style = pycodestyle.StyleGuide(ignore=['E501', 'E402', 'W503'])
+    style = pycodestyle.StyleGuide(ignore=['E501', 'E402', 'W503', 'E241'])
 
     py_files = [y for x in os.walk(os.path.abspath('.')) for y in glob(os.path.join(x[0], '*.py'))]
     result = style.check_files(py_files)
@@ -90,7 +90,7 @@ def test_pep8_conformance():
 class ConfigForTest(CommandConfig):
     def __init__(self, config, urls, cache, hooks, verbose):
         (prefix, bindir) = os.path.split(os.path.dirname(os.path.abspath(sys.argv[0])))
-        super().__init__('urlwatch', os.path.dirname(__file__), bindir, prefix, config, urls, hooks, cache, verbose)
+        super().__init__([], 'urlwatch', os.path.dirname(__file__), bindir, prefix, config, urls, hooks, cache, verbose)
 
 
 @contextlib.contextmanager

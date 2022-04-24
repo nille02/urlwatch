@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2022 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -337,13 +337,9 @@ class Csv2TextFilter(FilterBase):
     __kind__ = 'csv2text'
 
     __supported_subfilters__ = {
-        'format_message': 'A format string with the headers that will be outputted for each csv '
-                          'line (header will be lower-cased)',
-        'ignore_header': 'If your format string is number based, but the CSV has headers, '
-                         'this flag will force ignoring the header.',
-        'has_header': 'If specified and true - use the first line as a header. '
-                      'If false - force ignore first line as header (treat it as data). '
-                      'If not specified csv.Sniffer will be used.',
+        'format_message': 'A string used to format for each CSV line',
+        'ignore_header': 'Force index-based format string, even if headers are used',
+        'has_header': 'Override auto-detection of the first line as header',
     }
 
     __default_subfilter__ = 'format_message'
@@ -494,6 +490,17 @@ class StripFilter(FilterBase):
 
     def filter(self, data, subfilter):
         return data.strip()
+
+
+class StripLinesFilter(FilterBase):
+    """Strip leading and trailing whitespace in every line"""
+
+    __kind__ = 'striplines'
+
+    __no_subfilter__ = True
+
+    def filter(self, data, subfilter=None):
+        return '\n'.join(line.strip() for line in data.splitlines())
 
 
 class FilterBy(Enum):

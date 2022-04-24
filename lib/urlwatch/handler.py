@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2021 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2022 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -203,6 +203,11 @@ class Report(object):
         for job_state in job_states:
             if not any(job_state.verb == verb and not self.config['display'][verb]
                        for verb in ('unchanged', 'new', 'error')):
+                if (job_state.verb == 'changed'
+                        and not self.config['display'].get('empty-diff', True)
+                        and job_state.get_diff() == ''):
+                    continue
+
                 yield job_state
 
     def finish(self):
