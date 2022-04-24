@@ -142,7 +142,6 @@ class UrlwatchCommand:
         # (ignore_cached) and we do not want to store the newly-retrieved data yet (filter testing)
         return 0
 
-<<<<<<< HEAD
     def run_job(self):
         print('--run-job is deprecated and should not be used anymore!')
         job = self._find_job(self.urlwatch_config.run_job)
@@ -154,10 +153,8 @@ class UrlwatchCommand:
         self.urlwatcher.run_jobs()
         self.urlwatcher.close()
 
-    def test_diff_filter(self, id):
-=======
     def _resolve_job_history(self, id, max_entries=10):
->>>>>>> 4ee1d03b258d0cbd4350d9fc911fa7920b036cd5
+
         job = self._get_job(id)
 
         history_data = self.urlwatcher.cache_storage.get_history_data(job.get_guid(), max_entries)
@@ -246,13 +243,10 @@ class UrlwatchCommand:
             sys.exit(self.test_filter(self.urlwatch_config.test_filter))
         if self.urlwatch_config.test_diff_filter:
             sys.exit(self.test_diff_filter(self.urlwatch_config.test_diff_filter))
-<<<<<<< HEAD
         if self.urlwatch_config.run_job:
             sys.exit(self.run_job())
-=======
         if self.urlwatch_config.dump_history:
             sys.exit(self.dump_history(self.urlwatch_config.dump_history))
->>>>>>> 4ee1d03b258d0cbd4350d9fc911fa7920b036cd5
         if self.urlwatch_config.list:
             sys.exit(self.list_urls())
         if self.urlwatch_config.add is not None or self.urlwatch_config.delete is not None:

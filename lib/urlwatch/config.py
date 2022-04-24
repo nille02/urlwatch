@@ -101,11 +101,8 @@ class CommandConfig(BaseConfig):
         group.add_argument('--test-filter', metavar='JOB', help='test filter output of job by location or index')
         group.add_argument('--test-diff-filter', metavar='JOB',
                            help='test diff filter output of job by location or index (needs at least 2 snapshots)')
-<<<<<<< HEAD
         group.add_argument('--run-job', metavar='JOB', help='run a single Job by location or index')
-=======
         group.add_argument('--dump-history', metavar='JOB', help='dump historical cached data for a job')
->>>>>>> 4ee1d03b258d0cbd4350d9fc911fa7920b036cd5
         group = parser.add_argument_group('interactive commands ($EDITOR/$VISUAL)')
         group.add_argument('--edit', action='store_true', help='edit URL/job list')
         group.add_argument('--edit-config', action='store_true', help='edit configuration file')
