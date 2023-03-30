@@ -9,11 +9,32 @@ The format mostly follows [Keep a Changelog](http://keepachangelog.com/en/1.0.0/
 ### Added
 
 - `browser` job: Add support for specifying `useragent` (#700, by Francesco Versaci)
+- Document how to ignore whitespace changes (PR#707, by Paulo Magalhaes)
+- `shell` reporter: Call a script or program when chanegs are detected (fixes #650)
+- New `separate` configuration option for reporters to split reports into one-per-job (contributed by Ryne Everett)
+- `--change-location` option allowing job location to be changed without losing job history (#739, by trevorshannon)
+
+### Changed
+
+- Docs: Re-group diff-related topics and improve wording (PR#712, by neutric)
+- Improved HTML e-mail diff style, including Dark Mode support (#730, by trevorshannon)
+- Require Python >= 3.7, as Python 3.6 was EOL'd on 2021-12-23
+- `Dockerfile`: Shrink image by switching to an Alpine-based Python 3.11 base image,
+  this reduces the container size from 1 GiB to 151 MiB (#731, by Scott Edlund)
+- `--gc-cache` can now take a parameter to keep more than 1 historical snapshot
+  (#732, by trevorshannon)
 
 ### Fixed
 
 - Limit e-mail header length to 78 characters to avoid issues with some SMTP servers
   (PR#703, fixes #702, by Julien Palard)
+- Fix a ResourceWarning for unclosed files when running unit tests
+  (PR#698, by Louis Sautier)
+- Add support for html2text 2.1.1 and newer by feature-checking `-utf8` support via `-help` (fixes #718)
+- html2text options were only applied to the first job when using `job_defaults`
+  (PR#726, fixes #588, by trevorshannon)
+- Update Github tags watch filter documentation with new XPath (fixes #723, by Luis Aranguren)
+- Fix `--gc-cache` to clear unknown keys when using Redis storage (fixes #743, by scottmac) 
 
 ## [2.25] -- 2022-03-15
 

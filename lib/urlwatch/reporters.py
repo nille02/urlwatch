@@ -37,6 +37,7 @@ import sys
 import time
 import html
 import functools
+import subprocess
 
 import requests
 
@@ -94,7 +95,7 @@ class ReporterBase(object, metaclass=TrackSubClasses):
                                                       version=urlwatch.__version__,
                                                       copyright=urlwatch.__copyright__),
             'Website: {url}'.format(url=urlwatch.__url__),
-            'Buy me a coffee: https://ko-fi.com/thpx86',
+            'Support urlwatch development: https://github.com/sponsors/thp',
             'watched {count} URLs in {duration} seconds'.format(count=len(self.job_states),
                                                                 duration=self.duration.seconds),
         )
@@ -106,6 +107,10 @@ class ReporterBase(object, metaclass=TrackSubClasses):
             config = {}
 
         return othercls(self.report, config, self.job_states, self.duration)
+
+    @classmethod
+    def get_base_config(cls, report):
+        return report.config['report'][cls.mro()[-3].__kind__]
 
     @classmethod
     def reporter_documentation(cls):
@@ -129,11 +134,16 @@ class ReporterBase(object, metaclass=TrackSubClasses):
     def submit_all(cls, report, job_states, duration):
         any_enabled = False
         for name, subclass in cls.__subclasses__.items():
-            cfg = report.config['report'].get(name, {'enabled': False})
-            if cfg['enabled']:
+            cfg = report.config['report'].get(name, {})
+            if cfg.get('enabled', False):
                 any_enabled = True
                 logger.info('Submitting with %s (%r)', name, subclass)
-                subclass(report, cfg, job_states, duration).submit()
+                base_config = subclass.get_base_config(report)
+                if base_config.get('separate', False):
+                    for job_state in job_states:
+                        subclass(report, cfg, [job_state], duration).submit()
+                else:
+                    subclass(report, cfg, job_states, duration).submit()
 
         if not any_enabled:
             logger.warning('No reporters enabled.')
@@ -155,11 +165,14 @@ class SafeHtml(object):
 
 
 class HtmlReporter(ReporterBase):
+
+    __kind__ = 'html'
+
     def submit(self):
         yield from (str(part) for part in self._parts())
 
     def _parts(self):
-        cfg = self.report.config['report']['html']
+        cfg = self.get_base_config(self.report)
 
         yield SafeHtml("""<!DOCTYPE html>
         <html><head>
@@ -167,15 +180,29 @@ class HtmlReporter(ReporterBase):
             <meta http-equiv="content-type" content="text/html; charset=utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style type="text/css">
-                body { font-family: sans-serif; }
-                .diff_add { color: green; background-color: lightgreen; }
-                .diff_sub { color: red; background-color: lightred; }
-                .diff_chg { color: orange; background-color: lightyellow; }
+                body { font-family: sans-serif; line-height: 1.5em; }
+                .diff_add { background-color: #abf2bc; display: inline-block; }
+                .diff_sub { background-color: #ffd7d5; display: inline-block; }
+                .diff_chg { background-color: #f9e48b; display: inline-block; }
                 .unified_add { color: green; }
                 .unified_sub { color: red; }
                 .unified_nor { color: #333; }
+                td, th, colgroup { border: none; }
+                table, thead, tbody { border: 1px solid #9a9a9a; }
+                .diff_next { border-left: 1px solid #9a9a9a; }
+                td.diff_header, td.diff_next { color: #6e7781; background-color: #f5f5f5; text-align: right; vertical-align: top; }
                 table { font-family: monospace; }
+                td, th { padding: 0 0.5em; }
                 h2 span.verb { color: #888; }
+                @media (prefers-color-scheme: dark) {
+                    body { background-color: #121212; color: #fff; }
+                    a { color: #8ab5f8; }
+                    a:visited { color: #c58af9; }
+                    td.diff_header, td.diff_next { background-color: #1c1c1c; }
+                    .diff_add { background-color: #1c4329; }
+                    .diff_sub { background-color: #542527; }
+                    .diff_chg { background-color: #907709; }
+                }
             </style>
         </head><body>
         """)
@@ -247,8 +274,11 @@ class HtmlReporter(ReporterBase):
 
 
 class TextReporter(ReporterBase):
+
+    __kind__ = 'text'
+
     def submit(self):
-        cfg = self.report.config['report']['text']
+        cfg = self.get_base_config(self.report)
         line_length = cfg['line_length']
         show_details = cfg['details']
         show_footer = cfg['footer']
@@ -355,7 +385,7 @@ class StdoutReporter(TextReporter):
     def submit(self):
         print = self._get_print()
 
-        cfg = self.report.config['report']['text']
+        cfg = self.get_base_config(self.report)
         line_length = cfg['line_length']
 
         separators = (line_length * '=', line_length * '-', '-- ') if line_length else ()
@@ -445,6 +475,8 @@ class IFTTTReport(TextReporter):
 
 class WebServiceReporter(TextReporter):
     MAX_LENGTH = 1024
+
+    __kind__ = 'webservice'
 
     def web_service_get(self):
         raise NotImplementedError
@@ -748,8 +780,11 @@ class DiscordReporter(TextReporter):
 
 
 class MarkdownReporter(ReporterBase):
+
+    __kind__ = 'markdown'
+
     def submit(self, max_length=None):
-        cfg = self.report.config['report']['markdown']
+        cfg = self.get_base_config(self.report)
         show_details = cfg['details']
         show_footer = cfg['footer']
 
@@ -1059,3 +1094,32 @@ class ProwlReporter(TextReporter):
                 result.status_code, result.content))
 
         return result
+
+
+class ShellReporter(TextReporter):
+    """Pipe a message to a shell command"""
+
+    __kind__ = 'shell'
+
+    def submit(self):
+        text = '\n'.join(super().submit()) + '\n'
+
+        if not text:
+            logger.debug('Not calling shell reporter (no changes)')
+            return
+
+        cmd = self.config['command']
+
+        process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        stdout, stderr = process.communicate(text.encode())
+
+        if stdout and not self.config.get('ignore_stdout', False):
+            logger.info('Standard output from shell reporter: {!r}'.format(stdout))
+
+        if stderr and not self.config.get('ignore_stderr', True):
+            logger.warning('Standard error output from shell reporter: {!r}'.format(stderr))
+
+        exitcode = process.wait()
+        if exitcode != 0:
+            logger.error('Shell reporter {} exited with {}'.format(cmd, exitcode))

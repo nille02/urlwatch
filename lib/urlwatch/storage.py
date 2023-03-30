@@ -75,16 +75,19 @@ DEFAULT_CONFIG = {
             'details': True,
             'footer': True,
             'minimal': False,
+            'separate': False,
         },
 
         'markdown': {
             'details': True,
             'footer': True,
             'minimal': False,
+            'separate': False,
         },
 
         'html': {
             'diff': 'unified',  # "unified" or "table"
+            'separate': False,
         },
 
         'stdout': {
@@ -180,6 +183,12 @@ DEFAULT_CONFIG = {
             'priority': 0,
             'application': '',
             'subject': '{count} changes: {jobs}'
+        },
+        'shell': {
+            'enabled': False,
+            'command': '',
+            'ignore_stdout': True,
+            'ignore_stderr': False,
         },
     },
 
@@ -449,7 +458,11 @@ class CacheStorage(BaseFileStorage, metaclass=ABCMeta):
         ...
 
     @abstractmethod
-    def clean(self, guid):
+    def clean(self, guid, retain_limit=1):
+        ...
+
+    @abstractmethod
+    def move(self, guid, new_guid):
         ...
 
     def backup(self):
@@ -461,13 +474,15 @@ class CacheStorage(BaseFileStorage, metaclass=ABCMeta):
         for guid, data, timestamp, tries, etag in entries:
             self.save(None, guid, data, timestamp, tries, etag)
 
-    def gc(self, known_guids):
+    def gc(self, known_guids, retain_limit=1):
+        if retain_limit <= 0:
+            raise ValueError(f'Cache garbage collection must retain at least 1 historical snapshot per job (requested: {retain_limit})')
         for guid in set(self.get_guids()) - set(known_guids):
             print('Removing: {guid}'.format(guid=guid))
             self.delete(guid)
 
         for guid in known_guids:
-            count = self.clean(guid)
+            count = self.clean(guid, retain_limit)
             if count > 0:
                 print('Removed {count} old versions of {guid}'.format(count=count, guid=guid))
 
@@ -515,9 +530,15 @@ class CacheDirStorage(CacheStorage):
         if os.path.exists(filename):
             os.unlink(filename)
 
-    def clean(self, guid):
+    def clean(self, guid, retain_limit=1):
         # We only store the latest version, no need to clean
         return 0
+
+    def move(self, guid, new_guid):
+        if guid == new_guid:
+            return 0
+        os.rename(self._get_filename(guid), self._get_filename(new_guid))
+        return 1
 
 
 class CacheEntry(minidb.Model):
@@ -580,17 +601,36 @@ class CacheMiniDBStorage(CacheStorage):
         CacheEntry.delete_where(self.db, CacheEntry.c.guid == guid)
         self.db.commit()
 
-    def clean(self, guid):
-        keep_id = next((CacheEntry.query(self.db, CacheEntry.c.id, where=CacheEntry.c.guid == guid,
-                                         order_by=CacheEntry.c.timestamp.desc, limit=1)), (None,))[0]
-
-        if keep_id is not None:
-            result = CacheEntry.delete_where(self.db, (CacheEntry.c.guid == guid) & (CacheEntry.c.id != keep_id))
+    def clean(self, guid, retain_limit=1):
+        retain_limit = max(1, retain_limit)
+        keep_ids = [row[0] for row in CacheEntry.query(
+            self.db, CacheEntry.c.id, where=CacheEntry.c.guid == guid,
+            order_by=CacheEntry.c.timestamp.desc, limit=retain_limit)]
+        # If nothing's returned from the query, the given guid is not in the db
+        # and no action is needed.
+        if keep_ids:
+            where_clause = CacheEntry.c.guid == guid
+            for keep_id in keep_ids:
+                where_clause = where_clause & (CacheEntry.c.id != keep_id)
+            result = CacheEntry.delete_where(self.db, where_clause)
             self.db.commit()
             self.db.vacuum()
             return result
 
         return 0
+
+    def move(self, guid, new_guid):
+        total_moved = 0
+        if guid != new_guid:
+            # Note if there are existing records with 'new_guid', they will
+            # not be overwritten and the job histories will be merged.
+            for entry in CacheEntry.load(self.db, CacheEntry.c.guid == guid):
+                entry.guid = new_guid
+                entry.save()
+                total_moved += 1
+            self.db.commit()
+
+        return total_moved
 
 
 class CacheRedisStorage(CacheStorage):
@@ -612,7 +652,7 @@ class CacheRedisStorage(CacheStorage):
     def get_guids(self):
         guids = []
         for guid in self.db.keys(b'guid:*'):
-            guids.append(str(guid[len('guid:'):]))
+            guids.append(guid[len('guid:'):].decode())
         return guids
 
     def load(self, job, guid):
@@ -653,10 +693,21 @@ class CacheRedisStorage(CacheStorage):
     def delete(self, guid):
         self.db.delete(self._make_key(guid))
 
-    def clean(self, guid):
+    def clean(self, guid, retain_limit=1):
+        retain_limit = max(1, retain_limit)
         key = self._make_key(guid)
         i = self.db.llen(key)
-        if self.db.ltrim(key, 0, 0):
+        if self.db.ltrim(key, 0, retain_limit - 1):
             return i - self.db.llen(key)
 
         return 0
+
+    def move(self, guid, new_guid):
+        if guid == new_guid:
+            return 0
+        key = self._make_key(guid)
+        new_key = self._make_key(new_guid)
+        # Note if a list with 'new_key' already exists, the data stored there
+        # will be overwritten.
+        self.db.rename(key, new_key)
+        return self.db.llen(new_key)

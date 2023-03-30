@@ -98,6 +98,7 @@ class CommandConfig(BaseConfig):
         group.add_argument('--list', action='store_true', help='list jobs')
         group.add_argument('--add', metavar='JOB', help='add job (key1=value1,key2=value2,...)')
         group.add_argument('--delete', metavar='JOB', help='delete job by location or index')
+        group.add_argument('--change-location', metavar=('JOB', 'NEW_LOCATION'), nargs=2, help='change the location of an existing job by location or index')
         group.add_argument('--test-filter', metavar='JOB', help='test filter output of job by location or index')
         group.add_argument('--test-diff-filter', metavar='JOB',
                            help='test diff filter output of job by location or index (needs at least 2 snapshots)')
@@ -109,7 +110,8 @@ class CommandConfig(BaseConfig):
         group.add_argument('--edit-hooks', action='store_true', help='edit hooks script')
         group = parser.add_argument_group('miscellaneous')
         group.add_argument('--features', action='store_true', help='list supported jobs/filters/reporters')
-        group.add_argument('--gc-cache', action='store_true', help='remove old cache entries')
+        group.add_argument('--gc-cache', metavar='RETAIN_LIMIT', type=int, help='remove old cache entries, keeping the latest RETAIN_LIMIT (default: 1)',
+                           nargs='?', const=1)
 
         args = parser.parse_args(cmdline_args)
 

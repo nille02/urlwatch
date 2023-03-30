@@ -72,6 +72,9 @@ job list management:
    --delete JOB
           delete job by location or index
 
+   --change_location JOB NEW_LOCATION
+          change the location of an existing job by location or index
+
    --test-filter JOB
           test filter output of job by location or index
 
@@ -95,8 +98,8 @@ miscellaneous:
    --features
           list supported jobs/filters/reporters
 
-   --gc-cache
-          remove old cache entries
+   --gc-cache RETAIN_LIMIT
+          remove old cache entries, keeping the latest RETAIN_LIMIT (default: 1)
 
 
 Files
