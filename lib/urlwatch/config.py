@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2022 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2023 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -52,20 +52,12 @@ class BaseConfig(object):
 
 class CommandConfig(BaseConfig):
 
-    def __init__(self, args, pkgname, urlwatch_dir, bindir, prefix, config, urls, hooks, cache, verbose):
+    def __init__(self, args, pkgname, urlwatch_dir, prefix, config, urls, hooks, cache, verbose):
         super().__init__(pkgname, urlwatch_dir, config, urls, cache, hooks, verbose)
-        self.bindir = bindir
-        self.prefix = prefix
         self.migrate_cache = migrate_cache
         self.migrate_urls = migrate_urls
 
-        if self.bindir == 'bin':
-            # Installed system-wide
-            self.examples_dir = os.path.join(prefix, 'share', self.pkgname, 'examples')
-        else:
-            # Assume we are not yet installed
-            self.examples_dir = os.path.join(prefix, bindir, 'share', self.pkgname, 'examples')
-
+        self.examples_dir = os.path.join(prefix, 'share', self.pkgname, 'examples')
         self.urls_yaml_example = os.path.join(self.examples_dir, 'urls.yaml.example')
         self.hooks_py_example = os.path.join(self.examples_dir, 'hooks.py.example')
 

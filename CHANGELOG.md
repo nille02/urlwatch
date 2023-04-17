@@ -6,11 +6,19 @@ The format mostly follows [Keep a Changelog](http://keepachangelog.com/en/1.0.0/
 
 ## UNRELEASED
 
+### Fixed
+
+- Rework handling of running from a source checkout, fixes issues with example files
+  when `urlwatch` was run as `/usr/sbin/urlwatch`, e.g. on Void Linux (fixes #755)
+- Add support for docutils >= 0.18, which deprecated `frontend.OptionParser` (fixes #754)
+
+## [2.26] -- 2023-04-11
+
 ### Added
 
 - `browser` job: Add support for specifying `useragent` (#700, by Francesco Versaci)
 - Document how to ignore whitespace changes (PR#707, by Paulo Magalhaes)
-- `shell` reporter: Call a script or program when chanegs are detected (fixes #650)
+- `shell` reporter: Call a script or program when changes are detected (fixes #650)
 - New `separate` configuration option for reporters to split reports into one-per-job (contributed by Ryne Everett)
 - `--change-location` option allowing job location to be changed without losing job history (#739, by trevorshannon)
 

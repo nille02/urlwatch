@@ -12,17 +12,22 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('.'))
+
+HERE = os.path.abspath(os.path.dirname(__file__) or '.')
+ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
+
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(ROOT, 'lib'))
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'urlwatch'
-copyright = '2022 Thomas Perl'
+copyright = '2023 Thomas Perl'
 author = 'Thomas Perl'
 
 # The full version, including alpha/beta/rc tags
-release = '2.25'
+release = '2.26'
 
 
 # -- General configuration ---------------------------------------------------
