@@ -4,13 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format mostly follows [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## UNRELEASED
+## [2.28] -- 2023-05-03
+
+### Changed
+
+- Browser jobs: Migrate from Pyppeteer to Playwright (#761, by Paul Sattlegger, fixes #751)
+
+## [2.27] -- 2023-05-03
+
+### Added
+
+- `css` and `xpath` filters now accept a `sort` subfilter to sort matched elements lexicographically
 
 ### Fixed
 
 - Rework handling of running from a source checkout, fixes issues with example files
   when `urlwatch` was run as `/usr/sbin/urlwatch`, e.g. on Void Linux (fixes #755)
 - Add support for docutils >= 0.18, which deprecated `frontend.OptionParser` (fixes #754)
+- Browser jobs: Fix support for Python 3.11 with `@asyncio.coroutine` removal (#759, by Faster IT)
 
 ## [2.26] -- 2023-04-11
 

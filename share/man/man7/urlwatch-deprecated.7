@@ -27,12 +27,23 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "URLWATCH-DEPRECATED" "7" "Apr 11, 2023" "" "urlwatch"
+.TH "URLWATCH-DEPRECATED" "7" "May 03, 2023" "" "urlwatch"
 .SH NAME
 urlwatch-deprecated \- Documentation of feature deprecation in urlwatch
 .sp
 As features are deprecated and cleaned up, they are documented
 here with steps to update your configuration for replacements.
+.SH NETWORKIDLE0 AND NETWORKIDLE2 FOR WAIT_UNTIL IN BROWSER JOBS (SINCE 2.28)
+.sp
+Since version 2.28, execution of browser jobs uses Playwright instead of pyppetteer.
+.sp
+The previously\-supported \fBwait_until\fP values of \fBnetworkidle0\fP and \fBnetworkidle2\fP
+are not supported anymore. Playwright supports the values \fBload\fP, \fBdomcontentloaded\fP,
+\fBnetworkidle\fP (discouraged) or \fBcommit\fP instead.
+.sp
+Existing settings of \fBnetworkidle0\fP and \fBnetworkidle2\fP will be mapped to
+\fBnetworkidle\fP, and a warning will be issued. To silence the warning and continue
+to use \fBnetworkidle\fP, specify \fBwait_until: networkidle\fP explicitly.
 .SH FILTERS WITHOUT SUBFILTERS (SINCE 2.22)
 .sp
 In older urlwatch versions, it was possible to write custom
@@ -45,7 +56,7 @@ If you have written your own filter code like this:
 .nf
 .ft C
 class CustomFilter(filters.FilterBase):
-    """My old custom filter"""
+    \(dq\(dq\(dqMy old custom filter\(dq\(dq\(dq
 
     __kind__ = \(aqfoo\(aq
 
@@ -65,7 +76,7 @@ defined, the value of \fBsubfilter\fP will be \fBNone\fP):
 .nf
 .ft C
 class CustomFilter(filters.FilterBase):
-    """My new custom filter"""
+    \(dq\(dq\(dqMy new custom filter\(dq\(dq\(dq
 
     __kind__ = \(aqfoo\(aq
 

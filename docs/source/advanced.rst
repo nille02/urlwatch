@@ -18,7 +18,7 @@ Using word-based differences
 You can also specify an external ``diff``-style tool (a tool that takes
 two filenames (old, new) as parameter and returns on its standard output
 the difference of the files), for example to use :manpage:`wdiff(1)` to get
-word-based differences instead of line-based difference:
+word-based differences instead of line-based difference, or `pandiff <https://github.com/davidar/pandiff>`_ to get markdown differences:
 
 .. code-block:: yaml
 
@@ -323,12 +323,20 @@ Configuring how long browser jobs wait for pages to load
 --------------------------------------------------------
 
 For browser jobs, you can configure how long the headless browser will wait
-before a page is considered loaded by using the `wait_until` option. It can take one of four values:
+before a page is considered loaded by using the ``wait_until`` option.
 
-  - `load` will wait until the `load` browser event is fired (default).
-  - `documentloaded` will wait until the `DOMContentLoaded` browser event is fired.
-  - `networkidle0` will wait until there are no more than 0 network connections for at least 500 ms.
-  - `networkidle2` will wait until there are no more than 2 network connections for at least 500 ms.
+It can take one of four values (see `wait_until docs`_ of Playwright):
+
+   - ``load`` - consider operation to be finished when the load event is fired
+   - ``domcontentloaded`` - consider operation to be finished when the
+     DOMContentLoaded event is fired
+   - ``networkidle`` - **discouraged** consider operation to be finished when there
+     are no network connections for at least 500 ms. Don't use this method for
+     testing, rely on web assertions to assess readiness instead
+   - ``commit`` - consider operation to be finished when network response is
+     received and the document started loading
+
+.. _`wait_until docs`: https://playwright.dev/python/docs/api/class-page#page-goto-option-wait-until
 
 
 Treating ``NEW`` jobs as ``CHANGED``
