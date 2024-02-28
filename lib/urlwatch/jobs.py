@@ -196,7 +196,7 @@ class JobBase(object, metaclass=TrackSubClasses):
 
 class Job(JobBase):
     __required__ = ()
-    __optional__ = ('name', 'filter', 'max_tries', 'diff_tool', 'compared_versions', 'diff_filter', 'treat_new_as_changed', 'user_visible_url')
+    __optional__ = ('name', 'filter', 'max_tries', 'diff_tool', 'compared_versions', 'diff_filter', 'enabled', 'treat_new_as_changed', 'user_visible_url')
 
     # determine if hyperlink "a" tag is used in HtmlReporter
     def location_is_url(self):
@@ -204,6 +204,9 @@ class Job(JobBase):
 
     def pretty_name(self):
         return self.name if self.name else self.get_location()
+
+    def is_enabled(self):
+        return self.enabled is None or self.enabled
 
 
 class ShellJob(Job):
@@ -260,7 +263,7 @@ class UrlJob(Job):
     __required__ = ('url',)
     __optional__ = ('cookies', 'data', 'method', 'ssl_no_verify', 'ignore_cached', 'http_proxy', 'https_proxy',
                     'headers', 'ignore_connection_errors', 'ignore_http_error_codes', 'encoding', 'timeout',
-                    'ignore_timeout_errors', 'ignore_too_many_redirects')
+                    'ignore_timeout_errors', 'ignore_too_many_redirects', 'ignore_incomplete_reads')
 
     CHARSET_RE = re.compile('text/(html|plain); charset=([^;]*)')
 
@@ -387,6 +390,8 @@ class UrlJob(Job):
         if isinstance(exception, requests.exceptions.Timeout) and self.ignore_timeout_errors:
             return True
         if isinstance(exception, requests.exceptions.TooManyRedirects) and self.ignore_too_many_redirects:
+            return True
+        if isinstance(exception, requests.exceptions.ChunkedEncodingError) and self.ignore_incomplete_reads:
             return True
         elif isinstance(exception, requests.exceptions.HTTPError):
             status_code = exception.response.status_code

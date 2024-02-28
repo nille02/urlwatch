@@ -51,8 +51,8 @@ Job-specific optional keys:
 - ``data``: HTTP POST/PUT data
 - ``ssl_no_verify``: Do not verify SSL certificates (true/false)
 - ``ignore_cached``: Do not use cache control (ETag/Last-Modified) values (true/false)
-- ``http_proxy``: Proxy server to use for HTTP requests
-- ``https_proxy``: Proxy server to use for HTTPS requests
+- ``http_proxy``: Proxy server to use for HTTP requests (might be http:// or socks5://)
+- ``https_proxy``: Proxy server to use for HTTPS requests (might be http:// or socks5://)
 - ``headers``: HTTP header to send along with the request
 - ``encoding``: Override the character encoding from the server (see :ref:`advanced_topics`)
 - ``timeout``: Override the default socket timeout (see :ref:`advanced_topics`)
@@ -60,6 +60,7 @@ Job-specific optional keys:
 - ``ignore_http_error_codes``: List of HTTP errors to ignore (see :ref:`advanced_topics`)
 - ``ignore_timeout_errors``: Do not report errors when the timeout is hit
 - ``ignore_too_many_redirects``: Ignore redirect loops (see :ref:`advanced_topics`)
+- ``ignore_incomplete_reads``: Ignore incomplete HTTP responses (see :ref:`advanced_topics`)
 
 (Note: ``url`` implies ``kind: url``)
 
@@ -169,13 +170,14 @@ Optional keys for all job types
 
 - ``name``: Human-readable name/label of the job
 - ``filter``: :doc:`filters` (if any) to apply to the output (can be tested with ``--test-filter``)
-- ``max_tries``: Number of times to retry fetching the resource
+- ``max_tries``: After this many sequential failed runs, the error will be reported rather than ignored
 - ``diff_tool``: Command to a custom tool for generating diff text
 - ``diff_filter``: :doc:`filters` (if any) to apply to the diff result (can be tested with ``--test-diff-filter``)
 - ``treat_new_as_changed``: Will treat jobs that don't have any historic data as ``CHANGED`` instead of ``NEW`` (and create a diff for new jobs)
 - ``compared_versions``: Number of versions to compare for similarity
 - ``kind`` (redundant): Either ``url``, ``shell`` or ``browser``.  Automatically derived from the unique key (``url``, ``command`` or ``navigate``) of the job type
 - ``user_visible_url``: Different URL to show in reports (e.g. when watched URL is a REST API URL, and you want to show a webpage)
+- ``enabled``: Can be set to false to disable an individual job (default is ``true``)
 
 
 Setting keys for all jobs at once

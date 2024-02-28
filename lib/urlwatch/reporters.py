@@ -126,7 +126,12 @@ class ReporterBase(object, metaclass=TrackSubClasses):
         subclass = cls.__subclasses__[name]
         cfg = report.config['report'].get(name, {'enabled': False})
         if cfg['enabled']:
-            subclass(report, cfg, job_states, duration).submit()
+            base_config = subclass.get_base_config(report)
+            if base_config.get('separate', False):
+                for job_state in job_states:
+                    subclass(report, cfg, [job_state], duration).submit()
+            else:
+                subclass(report, cfg, job_states, duration).submit()
         else:
             raise ValueError('Reporter not enabled: {name}'.format(name=name))
 
@@ -179,8 +184,11 @@ class HtmlReporter(ReporterBase):
             <title>urlwatch</title>
             <meta http-equiv="content-type" content="text/html; charset=utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="color-scheme" content="light dark">
+            <meta name="supported-color-schemes" content="light dark only">
             <style type="text/css">
-                body { font-family: sans-serif; line-height: 1.5em; }
+                :root { color-scheme: light dark; supported-color-schemes: light dark; }
+                body { font-family: sans-serif; }
                 .diff_add { background-color: #abf2bc; display: inline-block; }
                 .diff_sub { background-color: #ffd7d5; display: inline-block; }
                 .diff_chg { background-color: #f9e48b; display: inline-block; }
@@ -191,8 +199,9 @@ class HtmlReporter(ReporterBase):
                 table, thead, tbody { border: 1px solid #9a9a9a; }
                 .diff_next { border-left: 1px solid #9a9a9a; }
                 td.diff_header, td.diff_next { color: #6e7781; background-color: #f5f5f5; text-align: right; vertical-align: top; }
-                table { font-family: monospace; }
+                table { font-family: monospace; line-height: 1.5em; }
                 td, th { padding: 0 0.5em; }
+                td[nowrap] { width: 50%; vertical-align: top; white-space: normal; word-break: break-word; }
                 h2 span.verb { color: #888; }
                 @media (prefers-color-scheme: dark) {
                     body { background-color: #121212; color: #fff; }
@@ -202,6 +211,7 @@ class HtmlReporter(ReporterBase):
                     .diff_add { background-color: #1c4329; }
                     .diff_sub { background-color: #542527; }
                     .diff_chg { background-color: #907709; }
+                    .unified_nor { color: #ddd; }
                 }
             </style>
         </head><body>
@@ -446,12 +456,13 @@ class EMailReporter(TextReporter):
         else:
             logger.error('Invalid entry for method {method}'.format(method=self.config['method']))
 
+        reply_to = self.config.get('reply_to', '')
         if self.config['html']:
             body_html = '\n'.join(self.convert(HtmlReporter).submit())
 
-            msg = mailer.msg_html(self.config['from'], self.config['to'], subject, body_text, body_html)
+            msg = mailer.msg_html(self.config['from'], self.config['to'], reply_to, subject, body_text, body_html)
         else:
-            msg = mailer.msg_plain(self.config['from'], self.config['to'], subject, body_text)
+            msg = mailer.msg_plain(self.config['from'], self.config['to'], reply_to, subject, body_text)
 
         mailer.send(msg)
 

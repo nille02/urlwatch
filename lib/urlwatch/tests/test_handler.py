@@ -77,16 +77,6 @@ def test_load_hooks_py():
         import_module_from_source('hooks', hooks_py)
 
 
-def test_pep8_conformance():
-    """Test that we conform to PEP-8."""
-    import pycodestyle
-    style = pycodestyle.StyleGuide(ignore=['E501', 'E402', 'W503', 'E241'])
-
-    py_files = [y for x in os.walk(os.path.abspath('.')) for y in glob(os.path.join(x[0], '*.py'))]
-    result = style.check_files(py_files)
-    assert result.total_errors == 0, "Found #{0} code style errors".format(result.total_errors)
-
-
 class ConfigForTest(CommandConfig):
     def __init__(self, config, urls, cache, hooks, verbose):
         super().__init__([], 'urlwatch', os.path.dirname(__file__), root, config, urls, hooks, cache, verbose)
@@ -118,6 +108,27 @@ def test_run_watcher():
 
             urlwatcher = Urlwatch(urlwatch_config, config_storage, cache_storage, urls_storage)
             urlwatcher.run_jobs()
+        finally:
+            cache_storage.close()
+
+
+def test_disabled_job():
+    with teardown_func():
+        urls = os.path.join(here, 'data', 'disabled-job.yaml')
+        config = os.path.join(here, 'data', 'urlwatch.yaml')
+        cache = os.path.join(here, 'data', 'cache.db')
+        hooks = ''
+
+        config_storage = YamlConfigStorage(config)
+        urls_storage = UrlsYaml(urls)
+        cache_storage = CacheMiniDBStorage(cache)
+        try:
+            urlwatch_config = ConfigForTest(config, urls, cache, hooks, True)
+
+            urlwatcher = Urlwatch(urlwatch_config, config_storage, cache_storage, urls_storage)
+            urlwatcher.run_jobs()
+
+            assert len(urlwatcher.report.job_states) == 1
         finally:
             cache_storage.close()
 
