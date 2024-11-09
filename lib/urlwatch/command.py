@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2023 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2024 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -95,16 +95,16 @@ class UrlwatchCommand:
         return 0
 
     def list_urls(self):
-        for idx, job in enumerate(self.urlwatcher.jobs):
+        for idx, job in enumerate(self.urlwatcher.jobs, 1):
             if self.urlwatch_config.verbose:
-                print('%d: %s' % (idx + 1, repr(job)))
+                print('%d: %s' % (idx, repr(job)))
             else:
                 pretty_name = job.pretty_name()
                 location = job.get_location()
                 if pretty_name != location:
-                    print('%d: %s ( %s )' % (idx + 1, pretty_name, location))
+                    print('%d: %s ( %s )' % (idx, pretty_name, location))
                 else:
-                    print('%d: %s' % (idx + 1, pretty_name))
+                    print('%d: %s' % (idx, pretty_name))
         return 0
 
     def _find_job(self, query):
@@ -211,6 +211,24 @@ class UrlwatchCommand:
                 print('Not found: %r' % (self.urlwatch_config.delete,))
                 save = False
 
+        if self.urlwatch_config.enable is not None:
+            job = self._find_job(self.urlwatch_config.enable)
+            if job is not None:
+                job.enabled = True
+                print(f'Enabled {job!r}')
+            else:
+                print(f'Not found: {self.urlwatch_config.enable!r}')
+                save = False
+
+        if self.urlwatch_config.disable is not None:
+            job = self._find_job(self.urlwatch_config.disable)
+            if job is not None:
+                job.enabled = False
+                print(f'Disabled {job!r}')
+            else:
+                print(f'Not found: {self.urlwatch_config.disable!r}')
+                save = False
+
         if self.urlwatch_config.add is not None:
             # Allow multiple specifications of filter=, so that multiple filters can be specified on the CLI
             items = [item.split('=', 1) for item in self.urlwatch_config.add.split(',')]
@@ -276,6 +294,8 @@ class UrlwatchCommand:
             sys.exit(self.list_urls())
         if (self.urlwatch_config.add is not None
                 or self.urlwatch_config.delete is not None
+                or self.urlwatch_config.enable is not None
+                or self.urlwatch_config.disable is not None
                 or self.urlwatch_config.change_location is not None):
             sys.exit(self.modify_urls())
 

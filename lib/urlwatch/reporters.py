@@ -1,6 +1,6 @@
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2023 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2024 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -313,7 +313,7 @@ class TextReporter(ReporterBase):
             sep = (line_length * '=') or None
             yield from (part for part in itertools.chain(
                 (sep,),
-                ('%02d. %s' % (idx + 1, line) for idx, line in enumerate(summary)),
+                ('%02d. %s' % (idx, line) for idx, line in enumerate(summary, 1)),
                 (sep, ''),
             ) if part is not None)
 
@@ -860,7 +860,7 @@ class MarkdownReporter(ReporterBase):
         # The footer/summary lengths are the sum of the length of their parts
         # plus the space taken up by newlines.
         if summary:
-            summary = ['%d. %s' % (idx + 1, line) for idx, line in enumerate(summary)]
+            summary = ['%d. %s' % (idx, line) for idx, line in enumerate(summary, 1)]
             summary_len = sum(len(part) for part in summary) + len(summary) - 1
         else:
             summary_len = 0
@@ -1134,3 +1134,33 @@ class ShellReporter(TextReporter):
         exitcode = process.wait()
         if exitcode != 0:
             logger.error('Shell reporter {} exited with {}'.format(cmd, exitcode))
+
+
+class GotifyReporter(MarkdownReporter):
+    """Send a message to a gotify server"""
+    MAX_LENGTH = 16 * 1024
+
+    __kind__ = 'gotify'
+
+    def submit(self):
+        body_markdown = '\n'.join(super().submit(self.MAX_LENGTH))
+        if not body_markdown:
+            logger.debug('Not sending message to gotify server (no changes)')
+            return
+
+        server_url = self.config['server_url']
+        url = f'{server_url}/message'
+
+        token = self.config['token']
+        headers = {'Authorization': f'Bearer {token}'}
+
+        requests.post(url, headers=headers, json={
+            "extras": {
+                "client::display": {
+                    "contentType": "text/markdown",
+                },
+            },
+            'message': body_markdown,
+            'priority': self.config['priority'],
+            'title': self.config['title'],
+        })

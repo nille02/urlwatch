@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of urlwatch (https://thp.io/2008/urlwatch/).
-# Copyright (c) 2008-2023 Thomas Perl <m@thp.io>
+# Copyright (c) 2008-2024 Thomas Perl <m@thp.io>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -35,6 +35,7 @@ import os
 import re
 import subprocess
 import textwrap
+from typing import Iterable, Optional, Set, FrozenSet, Sequence
 
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -196,7 +197,10 @@ class JobBase(object, metaclass=TrackSubClasses):
 
 class Job(JobBase):
     __required__ = ()
-    __optional__ = ('name', 'filter', 'max_tries', 'diff_tool', 'compared_versions', 'diff_filter', 'enabled', 'treat_new_as_changed', 'user_visible_url')
+    __optional__ = ('name', 'filter', 'max_tries', 'diff_tool', 'compared_versions', 'diff_filter', 'enabled', 'treat_new_as_changed', 'user_visible_url', 'tags')
+
+    def matching_tags(self, tags: Set[str]) -> Set[str]:
+        return self.tags & tags
 
     # determine if hyperlink "a" tag is used in HtmlReporter
     def location_is_url(self):
@@ -207,6 +211,19 @@ class Job(JobBase):
 
     def is_enabled(self):
         return self.enabled is None or self.enabled
+
+    @property
+    def tags(self) -> Optional[FrozenSet[str]]:
+        return self._tags
+
+    @tags.setter
+    def tags(self, value: Optional[Iterable[str]]):
+        if value is None:
+            self._tags = None
+        elif isinstance(value, str):
+            self._tags = frozenset([str])
+        else:
+            self._tags = frozenset(value)
 
 
 class ShellJob(Job):
@@ -413,7 +430,7 @@ class BrowserJob(Job):
 
     __required__ = ('navigate',)
 
-    __optional__ = ('wait_until', 'useragent', 'browser')
+    __optional__ = ('wait_until', 'wait_for', 'useragent', 'browser')
 
     def get_location(self):
         return self.user_visible_url or self.navigate
@@ -433,4 +450,9 @@ class BrowserJob(Job):
                 self.wait_until = 'networkidle'
 
             page.goto(self.navigate, wait_until=self.wait_until)
+
+            if self.wait_for:
+                locator = page.locator(self.wait_for)
+                locator.wait_for()
+
             return page.content()
