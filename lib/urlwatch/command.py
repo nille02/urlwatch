@@ -143,9 +143,9 @@ class UrlwatchCommand:
         return 0
 
     def run_new_jobs(self):
+        new_jobs = list()
         for idx, job in enumerate(self.urlwatcher.jobs):
             history_data = self.urlwatcher.cache_storage.get_history_data(job.get_guid(), 1)
-            new_jobs = list()
             if not history_data:
                 logger.info('Add Job: ' + job.pretty_name())
                 new_jobs.append(idx+1)
