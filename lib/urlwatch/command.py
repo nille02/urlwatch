@@ -142,6 +142,21 @@ class UrlwatchCommand:
         # (ignore_cached) and we do not want to store the newly-retrieved data yet (filter testing)
         return 0
 
+    def run_new_jobs(self):
+        for idx, job in enumerate(self.urlwatcher.jobs):
+            history_data = self.urlwatcher.cache_storage.get_history_data(job.get_guid(), 1)
+            new_jobs = list()
+            if not history_data:
+                print('Add Job: ' + job.pretty_name())
+                new_jobs.append(idx+1)
+
+        if len(new_jobs) != 0:
+            self.urlwatch_config.idx_set = frozenset(int(s) for s in new_jobs)
+        else:
+            return 1
+        self.urlwatcher.run_jobs()
+        self.urlwatcher.close()
+
     def _resolve_job_history(self, id, max_entries=10):
         job = self._get_job(id)
 
@@ -274,6 +289,8 @@ class UrlwatchCommand:
             sys.exit(self.test_filter(self.urlwatch_config.test_filter))
         if self.urlwatch_config.test_diff_filter:
             sys.exit(self.test_diff_filter(self.urlwatch_config.test_diff_filter))
+        if self.urlwatch_config.run_new_jobs:
+            sys.exit(self.run_new_jobs())
         if self.urlwatch_config.dump_history:
             sys.exit(self.dump_history(self.urlwatch_config.dump_history))
         if self.urlwatch_config.list:
