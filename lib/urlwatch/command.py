@@ -153,7 +153,7 @@ class UrlwatchCommand:
         if len(new_jobs) != 0:
             self.urlwatch_config.idx_set = frozenset(int(s) for s in new_jobs)
         else:
-            return 1
+            return 0
         self.urlwatcher.run_jobs()
         self.urlwatcher.close()
 
