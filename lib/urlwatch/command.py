@@ -147,7 +147,7 @@ class UrlwatchCommand:
             history_data = self.urlwatcher.cache_storage.get_history_data(job.get_guid(), 1)
             new_jobs = list()
             if not history_data:
-                print('Add Job: ' + job.pretty_name())
+                logger.info('Add Job: ' + job.pretty_name())
                 new_jobs.append(idx+1)
 
         if len(new_jobs) != 0:
