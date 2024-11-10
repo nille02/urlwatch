@@ -5,4 +5,3 @@ build
 venv/
 dist/
 *.egg
-/myhook-v2.py
