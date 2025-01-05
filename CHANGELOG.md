@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format mostly follows [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## UNRELEASED
+
+### Added
+
+- New command-line option `--prepare-jobs` to initialize new jobs or jobs without history (#831 by nille02)
+
+### Changed
+
+- Remove EOL'd Python 3.8 (new minimum requirement is Python 3.9), add Python 3.13 testing
+
 ## [2.29] -- 2024-10-28
 
 ### Added
