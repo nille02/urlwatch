@@ -288,13 +288,8 @@ class UrlwatchCommand:
             sys.exit(self.test_filter(self.urlwatch_config.test_filter))
         if self.urlwatch_config.test_diff_filter:
             sys.exit(self.test_diff_filter(self.urlwatch_config.test_diff_filter))
-<<<<<<< HEAD
-        if self.urlwatch_config.run_job:
-            sys.exit(self.run_job())
-=======
         if self.urlwatch_config.prepare_jobs:
             sys.exit(self.prepare_jobs())
->>>>>>> 1d24dd9de2bacbd080127dc24353178646618e3e
         if self.urlwatch_config.dump_history:
             sys.exit(self.dump_history(self.urlwatch_config.dump_history))
         if self.urlwatch_config.list:
