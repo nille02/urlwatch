@@ -459,7 +459,7 @@ class BrowserJob(Job):
                         locator = page.locator(self.wait_for)
                         locator.wait_for()
                     break
-                except:
+                except:  # noqa:E722
                     error_count = error_count + 1
                     if error_count > 10:
                         break
