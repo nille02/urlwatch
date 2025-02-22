@@ -440,19 +440,28 @@ class BrowserJob(Job):
 
     def retrieve(self, job_state):
         from playwright.sync_api import sync_playwright
+        from playwright_stealth import stealth_sync
         with sync_playwright() as playwright:
-            browser = playwright[self.browser or "chromium"].launch()
+            browser = playwright["firefox" or "chromium"].launch()
             page = browser.new_page(user_agent=self.useragent)
+            stealth_sync(page)
 
             if self.wait_until in ('networkidle0', 'networkidle2'):
                 logger.warning(f'wait_until has deprecated value of {self.wait_until}, see docs')
                 # Pyppetteer -> Playwright migration
                 self.wait_until = 'networkidle'
+            error_count = 0
+            while True:
+                try:
+                    page.goto(self.navigate, wait_until=self.wait_until, timeout=60000)
 
-            page.goto(self.navigate, wait_until=self.wait_until)
-
-            if self.wait_for:
-                locator = page.locator(self.wait_for)
-                locator.wait_for()
+                    if self.wait_for:
+                        locator = page.locator(self.wait_for)
+                        locator.wait_for()
+                    break
+                except:
+                    error_count = error_count + 1
+                    if error_count > 10:
+                        break
 
             return page.content()

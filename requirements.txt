@@ -1,7 +1,21 @@
 pyyaml
-minidb >= 2.0.8
+minidb
 requests
 keyring
 platformdirs
 lxml
 cssselect
+playwright
+pycodestyle
+pytest
+docutils
+pytesseract
+jq
+bs4
+beautifulsoup4
+pillow
+msgpack
+redis
+colorama
+setuptools
+appdirs

@@ -38,7 +38,7 @@ from .jobs import NotModifiedError
 
 logger = logging.getLogger(__name__)
 
-MAX_WORKERS = 10
+MAX_WORKERS = 2
 
 
 def run_parallel(func, items):
@@ -61,10 +61,12 @@ def run_jobs(urlwatcher):
     report = urlwatcher.report
 
     logger.debug('Processing %d jobs (out of %d)', len(jobs), len(urlwatcher.jobs))
+    print(f'Processing {len(jobs)} jobs (out of {len(urlwatcher.jobs)})')
     with contextlib.ExitStack() as exit_stack:
         for job_state in run_parallel(lambda job_state: job_state.process(),
                                       (exit_stack.enter_context(JobState(cache_storage, job)) for job in jobs)):
             logger.debug('Job finished: %s', job_state.job)
+            print(f'Job finished: {job_state.job.pretty_name()}')
 
             if not job_state.job.max_tries:
                 max_tries = 0
